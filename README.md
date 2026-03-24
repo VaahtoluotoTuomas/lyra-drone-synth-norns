@@ -24,12 +24,17 @@ The actual cross-wiring is done via array indexing, which swaps the routing so V
 ```supercollider
 var modulators = feedbackIn[[1, 0, 3, 2, 5, 4, 7, 6]];
 ```
-### 3. Safety Mechanisms
+### 3. The Hyper LFO (Chaotic Modulation)
+The engine features a "Hyper LFO", a complex low-frequency generator that produces chaotic modulation.
+* **The Concept:** It consists of two separate triangle wave LFOs (LFO A and LFO B) running at different base frequencies. 
+* **Cross-Modulation:** Using a dedicated control-rate feedback loop (`LocalIn.kr` and `LocalOut.kr`), the output of LFO A modulates the speed of LFO B, and vice versa. 
+* **The Result:** The `lfoCrossMod` parameter dictates how aggressively they pull each other off the rails. When turned up, the resulting summed waveform (`hyperLfo`) stops being a repeating pattern and turns into an organic, drifting, and unpredictable "breathing" motion. This is fed into the oscillators via `lfoPitchDepths` to create an unstable, living pitch drift.
+
+### 4. Safety Mechanisms
 Heavy feedback FM can easily cause math errors or silent crashes. This engine includes two safety nets:
 * **`LeakDC.ar` inside the loop:** Heavy FM with asymmetrical waveforms creates a DC offset (the wave gets stuck above or below 0). If fed back into the FM loop, this offset multiplies endlessly. `LeakDC` scrubs the signal clean before it goes back into `LocalOut`.
 * **Frequency `.clip(10, 15000)`:** Prevents the FM matrix from driving the oscillator frequency into negative values or above human hearing.
 
 ## Next Steps (Roadmap)
--  **Hyper LFO:** Implement a dual-LFO system where the LFOs can modulate each other, used for slowly drifting pitches and delay times.
 -  **Dual Modulated Delay:** Build a PT2399-style dual delay network that can be modulated by the raw audio of the oscillators themselves.
 -  **Norns Lua Script:** Map the SuperCollider parameters to the Norns screen, encoders, and Monome Grid.
