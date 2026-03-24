@@ -17,7 +17,7 @@ SynthDef(\lyra_core, {
 	var lfoCrossMod = \lfoCrossMod.kr(0.0); // (0.0 - 1.0)
 	var lfoPitchDepths = \lfoPitchDepths.kr([0, 0, 0, 0, 0, 0, 0, 0]); // lfo pitch effect
 
-	// --- DUAL DELAY PARAMETERS
+	// --- TAPE DELAY PARAMETERS
 	var dlyTime = \dlyTime.kr(0.4); // in seconds
 	var dlyFb = \dlyFb.kr(0.4); // (0.0 - 1.0)
 	var dlyMix = \dlyMix.kr(0.3); // (0.0 - 1.0)
@@ -38,12 +38,16 @@ SynthDef(\lyra_core, {
 
 	var lfoA = LFTri.kr(lfoFreqA + (lfoModA * lfoCrossMod * 5));
 	var lfoB = LFTri.kr(lfoFreqB + (lfoModB * lfoCrossMod * 5));
-
 	var hyperLfo = (lfoA + lfoB) * 0.5;
 
+	// --- LOCALIN.AR BUSSES ---
+	var localIn = LocalIn.ar(10);
+	var fmFeedbackIn = localIn[0..7]; // oscillators
+	var delayFbIn = localIn[8..9]; // delay channels
+
 	// --- SOUND SOURCES & CROSS MODULATION ---
-	var feedbackIn = LocalIn.ar(8);
-	var modulators = feedbackIn[[1, 0, 3, 2, 5, 4, 7, 6]];
+
+	var modulators = fmFeedbackIn[[1, 0, 3, 2, 5, 4, 7, 6]];
 
 	var lfoEffect = hyperLfo * lfoPitchDepths * 50;
 	var modFreqs = (freqs + lfoEffect + (modulators * fmDepths * 1000)).clip(10, 15000);
@@ -52,18 +56,19 @@ SynthDef(\lyra_core, {
 	var cleanOscs = LeakDC.ar(oscs);
 
 	var voices = cleanOscs * envs;
-
-	// --- MIX: SPREAD TO STEREO FIELD ---
 	var mixed = Splay.ar(voices);
 
-	// --- DUAL DELAY
+	// --- TAPE DELAY ---
 	var timeL = (dlyTime + (hyperLfo * dlyLfoMod)).clip(0.01, 2.0);
 	var timeR = (dlyTime + (hyperLfo * dlyLfoMod * -1.2)).clip(0.01, 2.0);
 
-	var decaySecs = dlyFb.linexp(0.0, 1.0, 0.1, 20.0);
+	var safeFb = dlyFb.clip(0.0, 0.99);
 
-	var delayL = CombC.ar(mixed[0], maxdelaytime: 2.0, delaytime: timeL, decaytime: decaySecs);
-	var delayR = CombC.ar(mixed[1], maxdelaytime: 2.0, delaytime: timeR, decaytime: decaySecs);
+	var inL = mixed[0] + (delayFbIn[0] * safeFb);
+	var inR = mixed[1] + (delayFbIn[1] * safeFb);
+
+	var delayL = DelayL.ar(inL, maxdelaytime: 2.0, delaytime: timeL);
+	var delayR = DelayL.ar(inR, maxdelaytime: 2.0, delaytime: timeR);
 
 	var wetL = LPF.ar(delayL, 2000);
 	var wetR = LPF.ar(delayR, 2000);
@@ -75,7 +80,7 @@ SynthDef(\lyra_core, {
 
 	// --- FM FEEDBACK SENDS ---
 	LocalOut.kr([lfoA, lfoB]);
-	LocalOut.ar(cleanOscs);
+	LocalOut.ar(cleanOscs ++ [wetL, wetR]);
 
 	Out.ar(out, finalOut * amp);
 }).add;
@@ -85,7 +90,7 @@ x = Synth(\lyra_core);
 
 // Testit
 
-x.set(\gates, [1, 0, 0, 0, 0, 0, 0, 0]);
+x.set(\gates, [1, 1, 0, 0, 0, 0, 0, 0]);
 x.set(\gates, [1, 1, 1, 1, 0, 0, 0, 0]);
 x.set(\gates, [0, 0, 0, 0, 0, 0, 1, 1]);
 x.set(\gates, [1, 1, 0, 0, 0, 1, 1, 0]);
